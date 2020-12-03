@@ -1,0 +1,552 @@
+---
+title: "IE582 Homework 1"
+author: "Umut Mete Saka"
+output: 
+    html_document : 
+      toc: true
+      toc_depth: 3
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Sports betting and forecasting is important for sports fans, team managers, sponsors, the media. Many punters around the world place their bets on the results of multiple sport matches. Football is one of the most popular one among these sports in number of fans and the betting volume and English Premiere League is one of the most popular in the world.  
+
+In this study I make explatory data analysis on the English Premiere League data of seasons 2018-19, 2019-20,2020-21. The analysis will contain data science and statistics approaches on the match and betting data.
+
+## Starting Points
+
+
+I start with loading required libraries and importing the data to R. To maintain reproducibility I will not use a dataset in my computer, instead I will import the data directly from web. The data I used can be found at [this link.](https://www.football-data.co.uk/englandm.php)
+
+```{r setup , message=FALSE, warning=FALSE, echo=TRUE}
+
+library(data.table)
+library(tidyverse)
+library(ggplot2)
+library(httr)
+library(scales)
+
+data_odds_1819 <- fread("https://www.football-data.co.uk/mmz4281/1819/E0.csv")
+data_odds_1920 <- fread("https://www.football-data.co.uk/mmz4281/1920/E0.csv")
+data_odds_2021 <- fread("https://www.football-data.co.uk/mmz4281/2021/E0.csv")
+
+```
+
+Next, I combined the datasets into one and remove redundant columns which is not going to be used in our analysis.
+
+```{r preparing main dataset}
+temp <- rbind(data_odds_1819,data_odds_1920,use.names = TRUE, fill = TRUE)
+data_odds_1821 <- rbind(temp,data_odds_2021,use.names = TRUE, fill = TRUE)
+
+data_odds_1821 <- data_odds_1821[,1:56]
+
+# For Task 3
+data_no_red <- data_odds_1821 %>% filter(HR==0) %>% filter(AR==0)
+
+```
+
+
+## Task 1
+
+As a start on analysis we start with plotting histograms of the data we interested.
+
+### Histogram of Home Score (Goals)
+
+
+```{r home goal hist}
+ggplot(data_odds_1821) + geom_histogram(aes(x = FTHG), binwidth=0.5) + ggtitle("Histogram of Home Goals")+ xlab("Home Goals") + ylab("Number of Games")
+```
+
+### Histogram of Away Score (Goals)
+
+```{r away goal hist}
+ggplot(data_odds_1821,labels = T ) + geom_histogram(aes(x = FTAG), binwidth=0.5)  + ggtitle("Histogram of Away Goals")+ xlab("Away Goals") + ylab("Number of Games") + ylim(0,300) + scale_x_continuous(breaks = pretty_breaks()) 
+```
+
+### Histogram of Difference of the Home and Away Score (Goals)
+
+```{r,warning=F}
+
+ggplot(data_odds_1821,labels = T ) + geom_histogram(aes(x = FTHG - FTAG), binwidth=0.5)  + ggtitle("Histogram of Home - Away Goals")+ xlab("Home goals – Away Goals") + ylab("Number of Games") + ylim(0,300) +xlim (-10,10)
+
+```
+
+### Distributions of the data
+
+From the graphs above I can guess the possible distributions of the data. Home Goal and Away goal graphs looks like poisson distribution graph. I will check my assumptions.
+
+
+#### Poisson Distribution on Home Score Data
+
+```{r}
+Home_distribution <-  data_odds_1821 %>% group_by(FTHG) %>% count()
+mean_home <- data_odds_1821$FTHG %>% mean()
+max_home <- data_odds_1821$FTHG %>% max()
+pois_home <- dpois(c(0:max_home),mean_home)*nrow(data_odds_1821)
+Home_distribution$pois = pois_home
+```
+
+I calculated mean value of Home Goals as `r mean_home` and max value as `r max_home`. Then I produce a dataset distributed with poisson with lambda = mean and max value. To see their compatability I draw the previous histogram of real home goal values and poisson distribution line with (λ=μ):
+
+```{r home_poisson }
+ggplot(Home_distribution,aes(FTHG)) + geom_col(aes(y=n)) + xlab("Home Goals") + ylab("Number of Games") + geom_point(aes(y=pois_home),color="red",cex=2.5) +geom_line(aes(y=pois_home),color="red",cex=0.5)
+
+```
+
+#### Poisson Distribution on Away Score Data
+
+```{r}
+Away_distribution <-  data_odds_1821 %>% group_by(FTAG) %>% count()
+
+Away_distribution <- rbind(Away_distribution,c(FTAG = 7, n = 0))
+Away_distribution <- rbind(Away_distribution,c(FTAG = 8, n = 0))
+Away_distribution <- Away_distribution %>% arrange(by=FTAG)
+
+mean_away <- data_odds_1821$FTAG %>% mean()
+max_away <- data_odds_1821$FTAG %>% max()
+pois_away <- dpois(c(0:max_away),mean_away)*nrow(data_odds_1821)
+Away_distribution$pois = pois_away
+```
+
+I calculated mean value of Away Goals as `r mean_away` and max value as `r max_away`. Then I produce a dataset distributed with poisson with lambda = mean and max value. To see their compatability I draw the previous histogram of real away goal values and poisson distribution line with (λ=μ):
+
+```{r away_poisson }
+ggplot(Away_distribution,aes(FTAG)) + geom_col(aes(y=n)) + xlab("Away Goals") + ylab("Number of Games") + geom_point(aes(y=pois_away),color="red",cex=2.5) +geom_line(aes(y=pois_away),color="red",cex=0.5)
+
+```
+
+
+It seems both data distributed very close to poisson. 
+
+####  Distribution on Home Score - Away Score Data
+
+When I plotted the Home Score - Away Score Data, I noticed that its distribution seems similiar to normal distribution. I will check my assumption.
+
+```{r, warning=FALSE}
+
+
+ggplot(data_odds_1821,labels = T ) + geom_histogram(aes(x = FTHG-FTAG,y= ..density..), binwidth=1)  + ggtitle("Histogram of Home - Away Goals")+ xlab("Home goals – Away Goals") + ylab("Number of Games")  +xlim (-10,10) + stat_function(fun = dnorm, color="magenta", args = list(mean = mean(data_odds_1821$FTHG - data_odds_1821$FTAG), sd = sd(data_odds_1821$FTHG - data_odds_1821$FTAG)))
+
+
+```
+
+
+
+
+## Task 2
+
+I will check the performance of betting sites. For this I will choose 4 betting sites and make required analysis seperately.
+
+### Bet & Win (BWH, BWD, BWA)
+
+#### Probabilities of Home Win, Draw and Away Win
+
+I start with finding the bet probabilities. In betting Probability can be found by calculating 1/odd. However betting sites want to ensure their profit so sum of all probabilities pass 1. Therefore we need to normalize.
+
+```{r}
+data_odds_1821 <- data_odds_1821 %>% mutate(P_home_BW = 1 / BWH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_draw_BW = 1 / BWD)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_away_BW = 1 / BWA)
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_sum_BW = (P_home_BW + P_draw_BW + P_away_BW))
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_home_BW=P_home_BW/P_sum_BW)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_draw_BW=P_draw_BW/P_sum_BW)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_away_BW=P_away_BW/P_sum_BW)
+
+data_odds_1821 %>% select(P_home_BW,P_draw_BW,P_away_BW,P_sum_BW,P_norm_home_BW,P_norm_draw_BW,P_norm_away_BW) %>% head(5)
+
+```
+
+#### Success of Guessing Draw Result 
+
+I expect that if two teams winning probabilites are close to each other probability of a game to end with draw result is higher. To visualise this I will plot the probability of draw versus the difference P(home)-P(win). Since probability is distributed between 1 and 0, I expect to see the difference between -1 and 1. I will divide this interval into smaller 0.10 wide intervals and count the numbers falling in these intervals. And dividing these count to the total number will eventually show me the real probability and let me compare the success of the forecasted probabilities of betting sites.
+
+```{r}
+
+bins <- seq(-1,1,0.1)
+
+data_odds_1821 <- data_odds_1821 %>% mutate(diff_BW = P_norm_home_BW-P_norm_away_BW)
+draw_data_1821 <-  data_odds_1821 %>% filter(FTR=="D")
+draw_data_1821 <- cbind(draw_data_1821, findInterval(draw_data_1821$diff_BW,bins))
+data_odds_1821 <- cbind(data_odds_1821, findInterval(data_odds_1821$diff_BW,bins))
+
+count_bins_draw <- draw_data_1821 %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_odds_1821 %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+
+ggplot()  + geom_point(data=data_odds_1821,aes(x=diff_BW,y=P_norm_draw_BW)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Bet&Win")
+
+
+
+```
+
+I can see that if the probabilities calculated by 1/odd of both sides to win is very close to each other, betting to draw has higher chance overall to win some money. But in the other cases, betting site does their job good that they get the higher chance. I can see this by the positions of red points. If they are above the black line there is higher chance for the punters. 
+
+Now I will check whether is it the same in 3 other betting companies with similar steps.
+
+### Interwetten
+
+#### Probabilities of Home Win, Draw and Away Win
+Probabilities calculated by 1/odd and normalized probabilities:
+
+```{r}
+data_odds_1821 <- data_odds_1821 %>% mutate(P_home_IW = 1 / IWH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_draw_IW = 1 / IWD)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_away_IW = 1 / IWA)
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_sum_IW = (P_home_IW + P_draw_IW + P_away_IW))
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_home_IW=P_home_IW/P_sum_IW)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_draw_IW=P_draw_IW/P_sum_IW)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_away_IW=P_away_IW/P_sum_IW)
+
+data_odds_1821 %>% select(P_home_IW,P_draw_IW,P_away_IW,P_sum_IW,P_norm_home_IW,P_norm_draw_IW,P_norm_away_IW) %>% head(5)
+
+
+```
+
+#### Success of Guessing Draw Result 
+
+
+```{r}
+bins <- seq(-1,1,0.1)
+data_odds_1821 <- data_odds_1821 %>% mutate(diff_IW = P_norm_home_IW-P_norm_away_IW)
+draw_data_1821 <-  data_odds_1821 %>% filter(FTR=="D")
+draw_data_1821$V2 = NULL
+data_odds_1821$V2 = NULL
+
+draw_data_1821 <- cbind(draw_data_1821, findInterval(draw_data_1821$diff_IW,bins))
+data_odds_1821 <- cbind(data_odds_1821, findInterval(data_odds_1821$diff_IW,bins))
+
+count_bins_draw <- draw_data_1821 %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_odds_1821 %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_odds_1821,aes(x=diff_IW,y=P_norm_draw_IW)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Interwetten")
+
+```
+
+### Pinnacle Sports
+
+#### Probabilities of Home Win, Draw and Away Win
+Probabilities calculated by 1/odd and normalized probabilities:
+```{r}
+data_odds_1821 <- data_odds_1821 %>% mutate(P_home_PS = 1 / PSH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_draw_PS = 1 / PSD)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_away_PS = 1 / PSA)
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_sum_PS = (P_home_PS + P_draw_PS + P_away_PS))
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_home_PS=P_home_PS/P_sum_PS)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_draw_PS=P_draw_PS/P_sum_PS)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_away_PS=P_away_PS/P_sum_PS)
+
+data_odds_1821 %>% select(P_home_PS,P_draw_PS,P_away_PS,P_sum_PS,P_norm_home_PS,P_norm_draw_PS,P_norm_away_PS) %>% head(5)
+
+```
+
+#### Success of Guessing Draw Result 
+
+```{r}
+
+bins <- seq(-1,1,0.1)
+data_odds_1821 <- data_odds_1821 %>% mutate(diff_PS = P_norm_home_PS-P_norm_away_PS)
+draw_data_1821 <-  data_odds_1821 %>% filter(FTR=="D")
+draw_data_1821$V2 = NULL
+data_odds_1821$V2 = NULL
+
+draw_data_1821 <- cbind(draw_data_1821, findInterval(draw_data_1821$diff_PS,bins))
+data_odds_1821 <- cbind(data_odds_1821, findInterval(data_odds_1821$diff_PS,bins))
+
+count_bins_draw <- draw_data_1821 %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_odds_1821 %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_odds_1821,aes(x=diff_PS,y=P_norm_draw_PS)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Pinnacle")
+
+
+```
+
+
+### William Hill
+
+#### Probabilities of Home Win, Draw and Away Win
+Probabilities calculated by 1/odd and normalized probabilities:
+```{r}
+data_odds_1821 <- data_odds_1821 %>% mutate(P_home_WH = 1 / WHH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_draw_WH = 1 / WHD)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_away_WH = 1 / WHA)
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_sum_WH = (P_home_WH + P_draw_WH + P_away_WH))
+
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_home_WH=P_home_WH/P_sum_WH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_draw_WH=P_draw_WH/P_sum_WH)
+data_odds_1821 <- data_odds_1821 %>% mutate(P_norm_away_WH=P_away_WH/P_sum_WH)
+
+data_odds_1821 %>% select(P_home_WH,P_draw_WH,P_away_WH,P_sum_WH,P_norm_home_WH,P_norm_draw_WH,P_norm_away_WH) %>% head(5)
+
+```
+
+#### Success of Guessing Draw Result 
+
+```{r}
+bins <- seq(-1,1,0.1)
+data_odds_1821 <- data_odds_1821 %>% mutate(diff_WH = P_norm_home_WH-P_norm_away_WH)
+draw_data_1821 <-  data_odds_1821 %>% filter(FTR=="D")
+draw_data_1821$V2 = NULL
+data_odds_1821$V2 = NULL
+
+draw_data_1821 <- cbind(draw_data_1821, findInterval(draw_data_1821$diff_WH,bins))
+data_odds_1821 <- cbind(data_odds_1821, findInterval(data_odds_1821$diff_WH,bins))
+
+count_bins_draw <- draw_data_1821 %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_odds_1821 %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_odds_1821,aes(x=diff_WH,y=P_norm_draw_WH)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("William Hill")
+
+```
+
+
+
+
+
+
+## Task 3
+
+Red cards can have notable effect on the game since there are only 11 players in one team and one team can immediately become disadvantageous and therefore even if two teams considered to have close probabilities on winning, a red card in the game can improve the winning chance of the other team drastically. This situation may lower the chance of draw in such game.
+
+Now I will remove matches with red card occurence and make analysis again to see its effects.
+
+### Bet & Win
+
+
+```{r}
+
+
+
+data_no_red <- data_no_red %>% mutate(P_home_BW = 1 / BWH)
+data_no_red <- data_no_red %>% mutate(P_draw_BW = 1 / BWD)
+data_no_red <- data_no_red %>% mutate(P_away_BW = 1 / BWA)
+
+data_no_red <- data_no_red %>% mutate(P_sum_BW = (P_home_BW + P_draw_BW + P_away_BW))
+
+data_no_red <- data_no_red %>% mutate(P_norm_home_BW=P_home_BW/P_sum_BW)
+data_no_red <- data_no_red %>% mutate(P_norm_draw_BW=P_draw_BW/P_sum_BW)
+data_no_red <- data_no_red %>% mutate(P_norm_away_BW=P_away_BW/P_sum_BW)
+
+```
+
+#### Success of Guessing Draw Result When Red Cards Removed
+
+
+```{r}
+
+bins <- seq(-1,1,0.1)
+
+data_no_red <- data_no_red %>% mutate(diff_BW = P_norm_home_BW-P_norm_away_BW)
+no_red_draw <-  data_no_red %>% filter(FTR=="D")
+no_red_draw <- cbind(no_red_draw, findInterval(no_red_draw$diff_BW,bins))
+data_no_red <- cbind(data_no_red, findInterval(data_no_red$diff_BW,bins))
+
+count_bins_draw <- no_red_draw %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_no_red %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+
+ggplot()  + geom_point(data=data_no_red,aes(x=diff_BW,y=P_norm_draw_BW)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Bet&Win")
+
+
+
+```
+
+I can see that if the probabilities calculated by 1/odd of both sides to win is very close to each other, betting to draw has higher chance overall to win some money. But in the other cases, betting site does their job good that they get the higher chance. I can see this by the positions of red points. If they are above the black line there is higher chance for the punters. 
+
+Now I will check whether is it the same in 3 other betting companies with similar steps.
+
+### Interwetten
+
+
+```{r}
+data_no_red <- data_no_red %>% mutate(P_home_IW = 1 / IWH)
+data_no_red <- data_no_red %>% mutate(P_draw_IW = 1 / IWD)
+data_no_red <- data_no_red %>% mutate(P_away_IW = 1 / IWA)
+
+data_no_red <- data_no_red %>% mutate(P_sum_IW = (P_home_IW + P_draw_IW + P_away_IW))
+
+data_no_red <- data_no_red %>% mutate(P_norm_home_IW=P_home_IW/P_sum_IW)
+data_no_red <- data_no_red %>% mutate(P_norm_draw_IW=P_draw_IW/P_sum_IW)
+data_no_red <- data_no_red %>% mutate(P_norm_away_IW=P_away_IW/P_sum_IW)
+
+
+
+```
+
+#### Success of Guessing Draw Result When Red Cards Removed
+
+
+```{r}
+bins <- seq(-1,1,0.1)
+data_no_red <- data_no_red %>% mutate(diff_IW = P_norm_home_IW-P_norm_away_IW)
+no_red_draw <-  data_no_red %>% filter(FTR=="D")
+no_red_draw$V2 = NULL
+data_no_red$V2 = NULL
+
+no_red_draw <- cbind(no_red_draw, findInterval(no_red_draw$diff_IW,bins))
+data_no_red <- cbind(data_no_red, findInterval(data_no_red$diff_IW,bins))
+
+count_bins_draw <- no_red_draw %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_no_red %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_no_red,aes(x=diff_IW,y=P_norm_draw_IW)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Interwetten")
+
+```
+
+### Pinnacle Sports
+
+```{r}
+data_no_red <- data_no_red %>% mutate(P_home_PS = 1 / PSH)
+data_no_red <- data_no_red %>% mutate(P_draw_PS = 1 / PSD)
+data_no_red <- data_no_red %>% mutate(P_away_PS = 1 / PSA)
+
+data_no_red <- data_no_red %>% mutate(P_sum_PS = (P_home_PS + P_draw_PS + P_away_PS))
+
+data_no_red <- data_no_red %>% mutate(P_norm_home_PS=P_home_PS/P_sum_PS)
+data_no_red <- data_no_red %>% mutate(P_norm_draw_PS=P_draw_PS/P_sum_PS)
+data_no_red <- data_no_red %>% mutate(P_norm_away_PS=P_away_PS/P_sum_PS)
+
+```
+
+#### Success of Guessing Draw Result When Red Cards Removed
+
+```{r}
+
+bins <- seq(-1,1,0.1)
+data_no_red <- data_no_red %>% mutate(diff_PS = P_norm_home_PS-P_norm_away_PS)
+no_red_draw <-  data_no_red %>% filter(FTR=="D")
+no_red_draw$V2 = NULL
+data_no_red$V2 = NULL
+
+no_red_draw <- cbind(no_red_draw, findInterval(no_red_draw$diff_PS,bins))
+data_no_red <- cbind(data_no_red, findInterval(data_no_red$diff_PS,bins))
+
+count_bins_draw <- no_red_draw %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_no_red %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_no_red,aes(x=diff_PS,y=P_norm_draw_PS)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("Pinnacle")
+
+
+```
+
+
+### William Hill
+
+```{r}
+data_no_red <- data_no_red %>% mutate(P_home_WH = 1 / WHH)
+data_no_red <- data_no_red %>% mutate(P_draw_WH = 1 / WHD)
+data_no_red <- data_no_red %>% mutate(P_away_WH = 1 / WHA)
+
+data_no_red <- data_no_red %>% mutate(P_sum_WH = (P_home_WH + P_draw_WH + P_away_WH))
+
+data_no_red <- data_no_red %>% mutate(P_norm_home_WH=P_home_WH/P_sum_WH)
+data_no_red <- data_no_red %>% mutate(P_norm_draw_WH=P_draw_WH/P_sum_WH)
+data_no_red <- data_no_red %>% mutate(P_norm_away_WH=P_away_WH/P_sum_WH)
+```
+
+#### Success of Guessing Draw Result When Red Cards Removed
+
+```{r}
+bins <- seq(-1,1,0.1)
+data_no_red <- data_no_red %>% mutate(diff_WH = P_norm_home_WH-P_norm_away_WH)
+no_red_draw <-  data_no_red %>% filter(FTR=="D")
+no_red_draw$V2 = NULL
+data_no_red$V2 = NULL
+
+no_red_draw <- cbind(no_red_draw, findInterval(no_red_draw$diff_WH,bins))
+data_no_red <- cbind(data_no_red, findInterval(data_no_red$diff_WH,bins))
+
+count_bins_draw <- no_red_draw %>% group_by(V2) %>% unique() %>% count()
+count_bins_total <- data_no_red %>% group_by(V2) %>% unique() %>% count()
+
+bins <- cbind(1:21, bins)
+bins <-  as.data.table(bins)
+bins <- left_join(bins,count_bins_draw,by=c("V1"="V2"))
+bins <- left_join(bins,count_bins_total,by=c("V1"="V2"))
+names(bins) <- c("order","bin","count_draw","count_total")
+bins[is.na(bins)] <- 0
+bins <- bins %>% mutate(ratio = count_draw/count_total)
+bins[is.na(bins)] <- 0
+ggplot()  + geom_point(data=data_no_red,aes(x=diff_WH,y=P_norm_draw_WH)) +geom_point(data= bins, aes(x = bin , y = ratio),color = "red",shape=15,cex = 2) + ylim(0,0.4) +  xlab("P(Home) – P(Away)") + ylab("P(Draw)") + ggtitle("William Hill")
+
+```
+
+#### Conclusion
+
+When the games with Red Card occurence removed, the probabilities fit better.
+
+
+
