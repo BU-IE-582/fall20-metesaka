@@ -1,0 +1,484 @@
+---
+title: "IE 582 Homework 2"
+author: "Umut Mete Saka"
+output: 
+    html_document : 
+      toc: true
+      toc_depth: 3
+      code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+In this study I perform Principal Component Analysis and Multi-Dimentional Scaling on gesture data. The Data consists of multiple accelation info of 8 types of gestures.
+
+## Starting Points
+
+### Loading libraries and preparing the dataset
+
+I start with loading required libraries and importing the data to R. To maintain reproducibility I will not use a dataset in my computer, instead I will import the data directly from web. The data I used can be found at [this link.](https://drive.google.com/drive/u/1/folders/13553neknux7U8why55KM1WrjgkA9IJKm)
+
+```{r setup , message=FALSE, warning=FALSE, echo=TRUE}
+
+library(data.table)
+library(tidyverse)
+library(scatterplot3d)
+library(stats)
+library(cowplot)
+
+
+
+train_x <- fread("https://raw.githubusercontent.com/BU-IE-582/fall20-metesaka/master/files/HW2/uWaveGestureLibrary_X_TRAIN")
+train_y <- fread("https://raw.githubusercontent.com/BU-IE-582/fall20-metesaka/master/files/HW2/uWaveGestureLibrary_Y_TRAIN")
+train_z <- fread("https://raw.githubusercontent.com/BU-IE-582/fall20-metesaka/master/files/HW2/uWaveGestureLibrary_Z_TRAIN")
+
+names(train_x) <- c("Class",1:(length(train_x)-1))
+names(train_y) <- c("Class",1:(length(train_y)-1))
+names(train_z) <- c("Class",1:(length(train_z)-1))
+train_x[,Index := 1:nrow(train_x)]
+train_y[,Index := 1:nrow(train_y)]
+train_z[,Index := 1:nrow(train_z)]
+```
+
+### Pivotting the dataset and merging 
+
+I pivot my data to long format and change titles.
+
+
+```{r}
+
+
+tempx <- pivot_longer(train_x,cols=c(-Class,-Index),names_to="time_index")
+names(tempx) <- c("Class","Index","Time_Index","X") 
+tempy <- pivot_longer(train_y,cols=c(-Class,-Index),names_to="time_index")
+names(tempy) <- c("Class","Index","Time_Index","Y")  
+tempz <- pivot_longer(train_z,cols=c(-Class,-Index),names_to="time_index")
+names(tempz) <- c("Class","Index","Time_Index","Z")  
+
+total_data <- tempx %>% cbind(tempy$Y) %>% cbind(tempz$Z) %>% data.table()
+total_data$Time_Index <- as.integer(total_data$Time_Index)
+names(total_data) <- c("Class","Index","Time_Index","X","Y","Z") 
+
+total_data <- total_data %>% relocate(Class, .after = Z)
+head(total_data,5)
+
+```
+
+### Visualising the data
+
+Now I visualize my data to have a nice start to my analysis. For this step I need to use scatterplot3d package and function. The data in our set provides my 896 different gestures which are divided into 8 class. The X, Y, Z column represent acceleration on the space at a given time. Every single gesture 315 time units to be done. 
+
+Since accelaration is the velocity change over time and velocity is the location change over time value, I can calculate the path of the gesture to visualise. My data is in time series format which means every gesture has its 315 accelaration value over time index so if I calculate cumulative sum of the X, Y and Z values I will have velşocity value. And doing the same step again will yield me the location change value. Cumsum function will start from 0, so my gesture will start from 0,0,0 when I draw my gestures.
+
+#### Gesture 1
+
+
+```{r}
+
+Ges1 <-filter(total_data , Class==1)[1:315]
+
+Ges1[,"V_X" := cumsum(X)]
+Ges1[,"V_Y" := cumsum(Y)]
+Ges1[,"V_Z" := cumsum(Z)]
+
+Ges1[,"P_X" := cumsum(V_X)]
+Ges1[,"P_Y" := cumsum(V_Y)]
+Ges1[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges1$P_X,Ges1$P_Y,Ges1$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 1 Example")
+
+```
+
+
+#### Gesture 2
+
+
+```{r}
+
+Ges2 <-filter(total_data , Class==2)[1:315]
+
+Ges2[,"V_X" := cumsum(X)]
+Ges2[,"V_Y" := cumsum(Y)]
+Ges2[,"V_Z" := cumsum(Z)]
+
+Ges2[,"P_X" := cumsum(V_X)]
+Ges2[,"P_Y" := cumsum(V_Y)]
+Ges2[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges2$P_X,Ges2$P_Y,Ges2$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 2 Example")
+
+```
+
+#### Gesture 3
+
+
+```{r}
+
+Ges3 <-filter(total_data , Class==3)[1:315]
+
+Ges3[,"V_X" := cumsum(X)]
+Ges3[,"V_Y" := cumsum(Y)]
+Ges3[,"V_Z" := cumsum(Z)]
+
+Ges3[,"P_X" := cumsum(V_X)]
+Ges3[,"P_Y" := cumsum(V_Y)]
+Ges3[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges3$P_X,Ges3$P_Y,Ges3$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 3 Example")
+
+```
+
+
+#### Gesture 4
+
+
+```{r}
+
+Ges4 <-filter(total_data , Class==4)[1:315]
+
+Ges4[,"V_X" := cumsum(X)]
+Ges4[,"V_Y" := cumsum(Y)]
+Ges4[,"V_Z" := cumsum(Z)]
+
+Ges4[,"P_X" := cumsum(V_X)]
+Ges4[,"P_Y" := cumsum(V_Y)]
+Ges4[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges4$P_X,Ges4$P_Y,Ges4$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 4 Example")
+
+```
+
+
+#### Gesture 5
+
+
+```{r}
+
+Ges5 <-filter(total_data , Class==5)[1:315]
+
+Ges5[,"V_X" := cumsum(X)]
+Ges5[,"V_Y" := cumsum(Y)]
+Ges5[,"V_Z" := cumsum(Z)]
+
+Ges5[,"P_X" := cumsum(V_X)]
+Ges5[,"P_Y" := cumsum(V_Y)]
+Ges5[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges5$P_X,Ges5$P_Y,Ges5$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 5 Example")
+
+```
+
+#### Gesture 6
+
+
+```{r}
+
+Ges6 <-filter(total_data , Class==6)[1:315]
+
+Ges6[,"V_X" := cumsum(X)]
+Ges6[,"V_Y" := cumsum(Y)]
+Ges6[,"V_Z" := cumsum(Z)]
+
+Ges6[,"P_X" := cumsum(V_X)]
+Ges6[,"P_Y" := cumsum(V_Y)]
+Ges6[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges6$P_X,Ges6$P_Y,Ges6$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 6 Example")
+
+```
+
+
+#### Gesture 7
+
+
+```{r}
+
+Ges7 <-filter(total_data , Class==7)[1:315]
+
+Ges7[,"V_X" := cumsum(X)]
+Ges7[,"V_Y" := cumsum(Y)]
+Ges7[,"V_Z" := cumsum(Z)]
+
+Ges7[,"P_X" := cumsum(V_X)]
+Ges7[,"P_Y" := cumsum(V_Y)]
+Ges7[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges7$P_X,Ges7$P_Y,Ges7$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 7 Example")
+
+```
+
+
+#### Gesture 8
+
+
+```{r}
+
+Ges8 <-filter(total_data , Class==8)[1:315]
+
+Ges8[,"V_X" := cumsum(X)]
+Ges8[,"V_Y" := cumsum(Y)]
+Ges8[,"V_Z" := cumsum(Z)]
+
+Ges8[,"P_X" := cumsum(V_X)]
+Ges8[,"P_Y" := cumsum(V_Y)]
+Ges8[,"P_Z" := cumsum(V_Z)]
+
+scatterplot3d(Ges8$P_X,Ges8$P_Y,Ges8$P_Z,xlab = "X", ylab = "Y", zlab ="Z",main = "Gesture 8 Example")
+
+```
+
+## Principal Component Analysis
+
+### PCA of total data
+
+I will perform Principal Component Analysis over the X,Y,Z columns in order to reduce dimentions. I will use princomp function from stats package.
+
+```{r}
+PCA <- princomp(total_data[,3:5])
+summary(princomp(cbind(PCA$scores[,1],PCA$scores[,2])))
+summary(PCA)
+```
+
+From the summary I observed that component 1 has 49% of the variance. I will use that component.
+
+Coefficients of the PCA(1):
+
+```{r}
+PCA$loadings[,1]
+```
+
+I will add the component 1 to my data using the coefficients above.
+
+```{r}
+total_data <- total_data %>% mutate(PCA_1 = 0.4268455*X + 0.7212650 * Y + 0.5455087 * Z )
+```
+
+To have it visualize, I will choose random 2 examples from every class and plot it over time.
+
+
+```{r}
+total_data %>% select(Index,Class) %>% group_by(Class) %>% unique() %>% head(21) %>% t() 
+```
+
+I will choose indices (11,17) , (15,20) , (4,13) , (8,9) , (2,14) , (1,18) , (7,12) , (6,21) as example of classes 1 to 8 respectively.
+
+
+```{r}
+selected <- total_data %>% filter(Index %in% c(1,2,4,6,7,8,9,11,12,13,14,15,17,18,20,21))
+  
+ggplot (selected, aes(x=Time_Index,y=PCA_1,color=as.factor(Class))) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2")
+
+
+```
+
+The plot is not so tidy so I will divide classes and plot again.
+
+```{r}
+selected <- total_data %>% filter(Index %in% c(11,17))
+pca_c1 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 1")
+
+selected <- total_data %>% filter(Index %in% c(15,20))
+pca_c2 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 2")
+
+selected <- total_data %>% filter(Index %in% c(4,13))
+pca_c3 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 3")
+
+selected <- total_data %>% filter(Index %in% c(8,9))
+pca_c4 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 4")
+
+plot_grid(pca_c1,pca_c2,pca_c3,pca_c4)
+```
+
+```{r}
+selected <- total_data %>% filter(Index %in% c(2,14))
+pca_c5 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 5")
+
+selected <- total_data %>% filter(Index %in% c(1,18))
+pca_c6 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 6")
+
+selected <- total_data %>% filter(Index %in% c(7,12))
+pca_c7 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 7")
+
+selected <- total_data %>% filter(Index %in% c(6,21))
+pca_c8 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 8")
+
+plot_grid(pca_c5,pca_c6,pca_c7,pca_c8)
+```
+
+I noticed that most instances from same class show similiar pattern as expected. However the fit is not perfect but this is also expected since the Principal Component 1 only represent the variance by 49%.
+
+
+### PCA of Seperated Data
+
+Now I will divide the dataset into classes and perform PCA one by one. 
+
+
+```{r}
+Class1 <- total_data %>% filter(Class==1)
+Class2 <- total_data %>% filter(Class==2)
+Class3 <- total_data %>% filter(Class==3)
+Class4 <- total_data %>% filter(Class==4)
+Class5 <- total_data %>% filter(Class==5)
+Class6 <- total_data %>% filter(Class==6)
+Class7 <- total_data %>% filter(Class==7)
+Class8 <- total_data %>% filter(Class==8)
+
+PCA_Cl1 <- princomp(Class1[,3:5])
+PCA_Cl2 <- princomp(Class2[,3:5])
+PCA_Cl3 <- princomp(Class3[,3:5])
+PCA_Cl4 <- princomp(Class4[,3:5])
+PCA_Cl5 <- princomp(Class5[,3:5])
+PCA_Cl6 <- princomp(Class6[,3:5])
+PCA_Cl7 <- princomp(Class7[,3:5])
+PCA_Cl8 <- princomp(Class8[,3:5])
+
+Class1 <- Class1 %>% mutate(PCA_1_sep = PCA_Cl1$loadings[1,1]*X + PCA_Cl1$loadings[2,1] * Y + PCA_Cl1$loadings[3,1] * Z )
+Class2 <- Class2 %>% mutate(PCA_1_sep = PCA_Cl2$loadings[1,1]*X + PCA_Cl2$loadings[2,1] * Y + PCA_Cl2$loadings[3,1] * Z )
+Class3 <- Class3 %>% mutate(PCA_1_sep = PCA_Cl3$loadings[1,1]*X + PCA_Cl3$loadings[2,1] * Y + PCA_Cl3$loadings[3,1] * Z )
+Class4 <- Class4 %>% mutate(PCA_1_sep = PCA_Cl4$loadings[1,1]*X + PCA_Cl4$loadings[2,1] * Y + PCA_Cl4$loadings[3,1] * Z )
+Class5 <- Class5 %>% mutate(PCA_1_sep = PCA_Cl5$loadings[1,1]*X + PCA_Cl5$loadings[2,1] * Y + PCA_Cl5$loadings[3,1] * Z )
+Class6 <- Class6 %>% mutate(PCA_1_sep = PCA_Cl6$loadings[1,1]*X + PCA_Cl6$loadings[2,1] * Y + PCA_Cl6$loadings[3,1] * Z )
+Class7 <- Class7 %>% mutate(PCA_1_sep = PCA_Cl7$loadings[1,1]*X + PCA_Cl7$loadings[2,1] * Y + PCA_Cl7$loadings[3,1] * Z )
+Class8 <- Class8 %>% mutate(PCA_1_sep = PCA_Cl8$loadings[1,1]*X + PCA_Cl8$loadings[2,1] * Y + PCA_Cl8$loadings[3,1] * Z )
+
+
+```
+ 
+ Principal Component Analysis of Class 1:
+```{r}
+summary(PCA_Cl1)
+```
+ 
+ Principal Component Analysis of Class 2:
+```{r}
+summary(PCA_Cl2)
+```
+
+Principal Component Analysis of Class 3:
+```{r}
+summary(PCA_Cl3)
+```
+
+Principal Component Analysis of Class 4:
+```{r}
+summary(PCA_Cl4)
+```
+
+Principal Component Analysis of Class 5:
+```{r}
+summary(PCA_Cl5)
+```
+
+Principal Component Analysis of Class 6:
+```{r}
+summary(PCA_Cl6)
+```
+
+Principal Component Analysis of Class 7:
+```{r}
+summary(PCA_Cl7)
+```
+
+Principal Component Analysis of Class 8:
+```{r}
+summary(PCA_Cl8)
+```
+
+To make a comparison, I will select the same indices for Class 1 and plot side by side.
+
+```{r}
+
+selected <- Class1 %>% filter(Index %in% c(11,17))
+pca_c1_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Seperated PCA")
+
+selected <- total_data %>% filter(Index %in% c(11,17))
+pca_c1_v2 <- ggplot (selected, aes(x=Time_Index,y=PCA_1)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Previous PCA")
+
+
+plot_grid(pca_c1_v2, pca_c1_sep)
+```
+
+And in one graph:
+
+
+```{r}
+selected <- Class1 %>% filter(Index %in% c(11,17))
+ggplot (selected, aes(x=Time_Index))+geom_point(aes(y=PCA_1),cex = 0.7,color = "red")  +geom_point(aes(y=PCA_1_sep),cex = 0.7,color = "blue") + xlab("Coordinate 1") + ylab("Coordinate 2")
+
+```
+* Here Red is the initial PCA with Cummulative data and Blue is the PCA performed only on Class 1 data *
+
+
+They perform a close correlation between each other, but the blue lines seems to have more correlation between each other than the red lines. This can be a sign that performing PCA within the class can yield better result. 
+
+It is too soon to state our claim so I will plot 2 random indices from every class to observe the performance of the Principal Components seperately.
+
+
+```{r}
+selected <- Class1 %>% filter(Index %in% c(357,420))
+pca_c1_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 1")
+
+selected <- Class2 %>% filter(Index %in% c(154,231))
+pca_c2_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 2")
+
+selected <- Class3 %>% filter(Index %in% c(320,488))
+pca_c3_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 3")
+
+selected <- Class4 %>% filter(Index %in% c(422,557))
+pca_c4_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 4")
+
+
+
+plot_grid(pca_c1_sep,pca_c2_sep,pca_c3_sep,pca_c4_sep)
+```
+
+
+```{r}
+selected <- Class5 %>% filter(Index %in% c(276,471))
+pca_c5_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 5")
+
+selected <- Class6 %>% filter(Index %in% c(705,760))
+pca_c6_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 6")
+
+selected <- Class7 %>% filter(Index %in% c(500,611))
+pca_c7_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 7")
+
+selected <- Class8 %>% filter(Index %in% c(530,607))
+pca_c8_sep <- ggplot (selected, aes(x=Time_Index,y=PCA_1_sep)) +geom_point() + xlab("Coordinate 1") + ylab("Coordinate 2") + ggtitle("Class 8")
+
+
+
+plot_grid(pca_c5_sep,pca_c6_sep,pca_c7_sep,pca_c8_sep)
+```
+
+
+## Multi-Dimentional Scaling
+
+```{r}
+
+temp<-cbind(train_x,train_y[,-1],train_z[,-1])
+names(temp) <-c("class",1:(length(temp)-1))
+temp <- as_tibble(temp)
+
+temp[,-1]<-scale(temp[,-1])
+
+distance <-  as.matrix(dist(temp[,-1], method = "euclidean"))
+mds <- cmdscale(distance,eig=TRUE, k=2)
+mds_x<-mds$points[,1]
+mds_y<-mds$points[,2]
+mds_all<-data.table(cbind(mds_x,mds_y,temp$class))
+names(mds_all)<-c("x","y","class")
+
+ggplot(mds_all,aes(x=mds_x,y=mds_y,color=as.factor(class)))+geom_point()+ ggtitle("Multi-Dimentional Scaling") + xlab("Coordinate 1") + ylab("Coordinate 2") 
+
+
+```
+
+Observing the plot, it can be seen that similiar classes group closer to each other. There is signs of clusters, however these clusters are very nested, especially in the middle. But there are several parts with only two classes are clustered together. Using clustering approaches will not help to find exact classes however it may eliminate some.
+
+
