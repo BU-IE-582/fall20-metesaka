@@ -9,3 +9,8 @@
 
 In Homework 1 I used English Premiere League data to see the performance of betting companies on determining their odds on matches resulted draw.
 
+### [Homework 2](https://bu-ie-582.github.io/fall20-metesaka/files/HW2/IE582_HW2.html)
+
+In Homework 2 I performed Principal Component Analysis over Gesture Data
+
+
